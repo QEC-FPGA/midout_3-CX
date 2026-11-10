@@ -6,6 +6,17 @@ from midout.gen._noise import (
     NoiseRule,
     occurs_in_classical_control_system,
 )
+from midout.gen._no_reset_syndrome import (
+    NoResetSyndromeTracker,
+    without_mid_circuit_resets_by_detectors,
+)
+from midout.gen._detector_basis_filter import (
+    with_only_detectors_from_basis,
+)
+from midout.gen._final_detector_layer import (
+    with_detectors_sorted_by_time_layer,
+    with_final_data_detectors_on_separate_time_layer,
+)
 from midout.gen._builder import (
     Builder,
     AtLayer,
@@ -32,6 +43,7 @@ from midout.gen._viz_patch_svg import (
 from midout.gen._surface_code import (
     surface_code_patch,
     checkerboard_basis,
+    lattice_surgery_surface_code_patch,
 )
 from midout.gen._flow_util import (
     verify_circuit_has_all_possible_detectors,

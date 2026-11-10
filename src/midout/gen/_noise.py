@@ -1,4 +1,4 @@
-from typing import Optional, Dict, Set, List, Iterator, Union, AbstractSet, DefaultDict, Any
+from typing import Optional, Dict, Set, List, Iterator, Union, AbstractSet, DefaultDict, Any, FrozenSet, Tuple
 
 import collections
 
@@ -159,13 +159,15 @@ class NoiseModel:
                  gate_rules: Optional[Dict[str, NoiseRule]] = None,
                  measure_rules: Optional[Dict[str, NoiseRule]] = None,
                  any_clifford_1q_rule: Optional[NoiseRule] = None,
-                 any_clifford_2q_rule: Optional[NoiseRule] = None):
+                 any_clifford_2q_rule: Optional[NoiseRule] = None,
+                 phenomenological_strength: Optional[float] = None):
         self.idle_depolarization = idle_depolarization
         self.additional_depolarization_waiting_for_m_or_r = additional_depolarization_waiting_for_m_or_r
         self.gate_rules = gate_rules
         self.measure_rules = measure_rules
         self.any_clifford_1q_rule = any_clifford_1q_rule
         self.any_clifford_2q_rule = any_clifford_2q_rule
+        self.phenomenological_strength = phenomenological_strength
 
     @staticmethod
     def si1000(p: float) -> 'NoiseModel':
@@ -242,8 +244,35 @@ class NoiseModel:
             }
         )
 
+    @staticmethod
+    def phenomenological(p: float) -> 'NoiseModel':
+        """A phenomenological noise model.
+
+        This is a simplified model that includes:
+        - Idle depolarization
+        - Dissipative gates have their result probabilistically bit flipped (or phase flipped if appropriate)
+        """
+        return NoiseModel(
+            idle_depolarization=0,
+            additional_depolarization_waiting_for_m_or_r=0,
+            any_clifford_1q_rule=NoiseRule(after={}),
+            any_clifford_2q_rule=NoiseRule(after={}),
+            measure_rules={
+                'Z': NoiseRule(after={}, flip_result=p),
+                'X': NoiseRule(after={}, flip_result=p),
+            },
+            gate_rules={
+                'R': NoiseRule(after={'X_ERROR': p}),
+                'RX': NoiseRule(after={'Z_ERROR': p}),
+            },
+            phenomenological_strength=p,
+        )
+
     def _noise_rule_for_split_operation(self, *, split_op: stim.CircuitInstruction) -> Optional[NoiseRule]:
         if occurs_in_classical_control_system(split_op):
+            return None
+
+        if OP_TYPES[split_op.name] == NOISE:
             return None
 
         rule = self.gate_rules.get(split_op.name)
@@ -339,6 +368,7 @@ class NoiseModel:
                       *,
                       system_qubits: Optional[Set[int]] = None,
                       immune_qubits: Optional[Set[int]] = None,
+                      round_end_data_qubit_sets: Tuple[Optional[FrozenSet[int]], ...] = (),
                       ) -> stim.Circuit:
         """Returns a noisy version of the given circuit, by applying the receiving noise model.
 
@@ -354,6 +384,14 @@ class NoiseModel:
             system_qubits = set(range(circuit.num_qubits))
         if immune_qubits is None:
             immune_qubits = set()
+
+        if round_end_data_qubit_sets:
+            return self._noisy_circuit_with_round_end_data_noise(
+                circuit,
+                system_qubits=system_qubits,
+                immune_qubits=immune_qubits,
+                round_end_data_qubit_sets=collections.deque(round_end_data_qubit_sets),
+            )
 
         result = stim.Circuit()
 
@@ -380,6 +418,82 @@ class NoiseModel:
                     system_qubits=system_qubits,
                     immune_qubits=immune_qubits,
                 )
+
+        return result
+
+    def _noisy_circuit_with_round_end_data_noise(
+            self,
+            circuit: stim.Circuit,
+            *,
+            system_qubits: AbstractSet[int],
+            immune_qubits: AbstractSet[int],
+            round_end_data_qubit_sets: 'collections.deque[Optional[FrozenSet[int]]]',
+    ) -> stim.Circuit:
+        result = stim.Circuit()
+
+        first = True
+        for moment_split_ops in _iter_split_op_moments(circuit, immune_qubits=immune_qubits):
+            if first:
+                first = False
+            elif result and isinstance(result[-1], stim.CircuitRepeatBlock):
+                pass
+            else:
+                result.append('TICK')
+
+            if isinstance(moment_split_ops, stim.CircuitRepeatBlock):
+                repeat_body = moment_split_ops.body_copy()
+                measurement_moments_per_iteration = _count_measurement_moments(
+                    repeat_body,
+                    immune_qubits=immune_qubits,
+                )
+                per_iteration_schedules = tuple(
+                    _take_schedule_chunk(round_end_data_qubit_sets, measurement_moments_per_iteration)
+                    for _ in range(moment_split_ops.repeat_count)
+                )
+                if len(set(per_iteration_schedules)) == 1:
+                    noisy_body = self.noisy_circuit(
+                        repeat_body,
+                        system_qubits=system_qubits,
+                        immune_qubits=immune_qubits,
+                        round_end_data_qubit_sets=per_iteration_schedules[0],
+                    )
+                    noisy_body.append('TICK')
+                    result.append(stim.CircuitRepeatBlock(
+                        repeat_count=moment_split_ops.repeat_count,
+                        body=noisy_body,
+                    ))
+                else:
+                    expanded_body = stim.Circuit()
+                    for schedule in per_iteration_schedules:
+                        noisy_body = self.noisy_circuit(
+                            repeat_body,
+                            system_qubits=system_qubits,
+                            immune_qubits=immune_qubits,
+                            round_end_data_qubit_sets=schedule,
+                        )
+                        if expanded_body and noisy_body:
+                            expanded_body.append('TICK')
+                        expanded_body += noisy_body
+                    result += expanded_body
+            else:
+                self._append_noisy_moment(
+                    moment_split_ops=moment_split_ops,
+                    out=result,
+                    system_qubits=system_qubits,
+                    immune_qubits=immune_qubits,
+                )
+
+                if _moment_has_measurement_ops(moment_split_ops):
+                    if not round_end_data_qubit_sets:
+                        raise ValueError("Not enough round_end_data_qubit_sets entries for measurement moments.")
+                    data_qubits = round_end_data_qubit_sets.popleft()
+                    if data_qubits and self.phenomenological_strength:
+                        active_qubits = sorted(q for q in data_qubits if q not in immune_qubits)
+                        if active_qubits:
+                            result.append('DEPOLARIZE1', active_qubits, self.phenomenological_strength)
+
+        if round_end_data_qubit_sets:
+            raise ValueError("Unused round_end_data_qubit_sets entries remained after processing the circuit.")
 
         return result
 
@@ -481,6 +595,36 @@ def _iter_split_op_moments(circuit: stim.Circuit, *, immune_qubits: AbstractSet[
                 cur_moment.extend(_split_targets_if_needed(op, immune_qubits=immune_qubits))
     if cur_moment:
         yield cur_moment
+
+
+def _moment_has_measurement_ops(moment_split_ops: List[stim.CircuitInstruction]) -> bool:
+    return any(
+        OP_TYPES[split_op.name] in {MEASURE_RESET_1Q, JUST_MEASURE_1Q, MPP}
+        for split_op in moment_split_ops
+        if not occurs_in_classical_control_system(split_op)
+    )
+
+
+def _count_measurement_moments(circuit: stim.Circuit, *, immune_qubits: AbstractSet[int]) -> int:
+    count = 0
+    for moment_or_block in _iter_split_op_moments(circuit, immune_qubits=immune_qubits):
+        if isinstance(moment_or_block, stim.CircuitRepeatBlock):
+            count += moment_or_block.repeat_count * _count_measurement_moments(
+                moment_or_block.body_copy(),
+                immune_qubits=immune_qubits,
+            )
+        elif _moment_has_measurement_ops(moment_or_block):
+            count += 1
+    return count
+
+
+def _take_schedule_chunk(
+        round_end_data_qubit_sets: 'collections.deque[Optional[FrozenSet[int]]]',
+        size: int,
+) -> Tuple[Optional[FrozenSet[int]], ...]:
+    if len(round_end_data_qubit_sets) < size:
+        raise ValueError("Not enough round_end_data_qubit_sets entries for repeat body.")
+    return tuple(round_end_data_qubit_sets.popleft() for _ in range(size))
 
 
 def _measure_basis(*, split_op: stim.CircuitInstruction) -> Optional[str]:

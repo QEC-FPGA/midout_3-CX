@@ -1,0 +1,28 @@
+{
+  "upstream_repository": "https://github.com/Strilanc/midout",
+  "upstream_commit": "941a0ca5b9fd2c0a122eef2a8f41d0d3188ed265",
+  "frozen_research_files": {
+    "__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "_circuit_case.py": "352823daeadcdfb7c6696c695e6a6ab2d7adcf2b817d88792c375e67cac35ad8",
+    "gen/__init__.py": "fce5ffe33a06e26ae4b4007cb83c6e2a95484505ec12c1b7ca8eeb84a560def4",
+    "gen/_builder.py": "a060efe9e42e5f16f38dffd0f1d06dd5329fa13a3b91738d4afbae6f116b785d",
+    "gen/_chunk.py": "06bda85d352246237ddec32b28bb0cab05340279a75c434340ae1ccd038a7555",
+    "gen/_detector_basis_filter.py": "79bacc9a3f9e689393f1f57d1cadaa65acda314a1df234418c0991e419e6fb49",
+    "gen/_final_detector_layer.py": "356d56d954dee7525c89db50cd001ba4908516aaa35814b90130d56589e5e7a7",
+    "gen/_flow.py": "daa8fe58a311ae605f21791b680aef865866894bbae3a671e369b25dae615daa",
+    "gen/_flow_util.py": "cc6c6438d62f306316f533bfac967dbb0f8ba1a4791eab3dedf6c8870050f9a7",
+    "gen/_flow_verifier.py": "faf57e7410dcb11ed63902f9f1f7a275d6467921f581a441a5b23309554f75e4",
+    "gen/_interaction_planner.py": "01ed26bcfd3b594456509a5a734d82499371554a3278f0a25f77ee8e18c896e2",
+    "gen/_layer_translate.py": "cdc85a0c333b586b03d562ae35e332d1c83e022585962111a434058d45587076",
+    "gen/_no_reset_syndrome.py": "e38471779b1798bb355ff08572955f7310585ac744e1e04d3dfbfcfc197bca43",
+    "gen/_noise.py": "605a4a520013279d8875d2e0f0ddc47d8d3c2ab288023eb55f89fcc8968b9b18",
+    "gen/_patch.py": "b934075c00ec6dd42de427e7678518a17f222f8278cfd4e0ed839130ac32e95b",
+    "gen/_surface_code.py": "d97c9e29d4350855dcde93498450a55f39e3111aefbd30bca6ab385a05bd7276",
+    "gen/_tile.py": "b501bf7881cff47660ac30dbb5419982a395880dcc1080bbb03a221acb5c2dc3",
+    "gen/_util.py": "2adffd19753b8413a367216089e9a01cdef4c0d7827bf6dad612f838712448ff",
+    "gen/_viz_circuit_html.py": "8367aecdb13b7c8f83bfc68e5f5f07f348629e87d655649c2d3648ce4990780e",
+    "gen/_viz_patch_svg.py": "93aa2055e099719ae4d63688197f4b202263ff76f00537222a0ca0f2445bdcbd",
+    "planar/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "planar/_three_coupler_surface_codes.py": "0a0b4a8e920fbded0e61eb3c09cbb01c916a1d3b0591aec43778c98b8e7e3444"
+  }
+}

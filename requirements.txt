@@ -1,7 +1,0 @@
-matplotlib ~= 3.5
-numpy
-pymatching ~= 2.0
-pytest
-scipy
-sinter == 1.11
-stim == 1.11

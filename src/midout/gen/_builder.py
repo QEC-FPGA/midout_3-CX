@@ -116,7 +116,7 @@ class Builder:
         circuit = stim.Circuit()
         for q, i in q2i.items():
             c = to_circuit_coord_data(q)
-            circuit.append("QUBIT_COORDS", [i], [c.real, c.imag])
+            circuit.append("QUBIT_COORDS", [i], [c.imag, c.real])
         return Builder(
             q2i=q2i,
             circuit=circuit,
@@ -278,7 +278,8 @@ class Builder:
                  mark_as_post_selected: bool = False,
                  ignore_non_existent: bool = False) -> None:
         if pos is not None:
-            coords = [pos.real, pos.imag, t]
+            # coords = [pos.real, pos.imag, t]
+            coords = [pos.imag, pos.real, t]
             if mark_as_post_selected:
                 coords.append(1)
         else:
